@@ -13,6 +13,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/ethereum/go-ethereum/ethclient"
+	"github.com/fasthttp/websocket"
 	"github.com/go-redis/redis/v8"
 	"github.com/robfig/cron/v3"
 	"github.com/valyala/fasthttp"
@@ -25,12 +26,17 @@ import (
 var (
 	ethClient          *ethclient.Client
 	proxyServer        *proxy.ReverseProxy
+	wsProxyServer      *proxy.WSReverseProxy
 	rdb                *redis.Client
 	mongoClient        *mongo.Client
 	mongoDatabase      *mongo.Database
 	redisCtx           = context.Background()
 	strContentType     = []byte("Content-Type")
 	strApplicationJSON = []byte("application/json")
+	upgrader           = websocket.FastHTTPUpgrader{
+		WriteBufferSize: 1024,
+		ReadBufferSize:  1024,
+	}
 )
 
 // LogRequest struct
@@ -152,120 +158,50 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 		var req LogRequest
 		json.Unmarshal(ctx.PostBody(), &req)
 		if strings.ToLower(req.Method) == "eth_getlogs" && req.ID == 1 {
-			var logs []Log
-			// Set the content type response header
-			ctx.Response.Header.SetCanonical(strContentType, strApplicationJSON)
-			// Build the redis key
-			redisKeyBytes, err := json.Marshal(req)
+			err := GetLogs(req, ctx)
 			if err != nil {
-				Logger.Errorf("error while marshaling request: %v", err)
-				// Error while marshaling request
-				proxyServer.ServeHTTP(ctx)
-				return
+				Logger.Errorf("error while retrieving logs: %v", err)
 			}
-			redisKey := string(redisKeyBytes)
-			// Retrieve the value from redis, if it exists
-			val, err := rdb.Get(redisCtx, redisKey).Result()
-			if err == nil || err == redis.Nil {
-				// An error has occurred or the key was not set, retrieve it from couchdb
-				bsonFilter := bson.M{}
-				if len(req.Params) > 0 {
-					filter := req.Params[0]
-					if filter.Address != "" {
-						bsonFilter["address"] = filter.Address
-					}
-					if filter.FromBlock != "" {
-						switch filter.FromBlock.(type) {
-						case string:
-							if filter.FromBlock == "earliest" {
-								bsonFilter["fromBlock"] = bson.M{"$ge": 0}
-							} else if filter.FromBlock == "latest" {
-								blockNumber, err := ethClient.BlockNumber(context.TODO())
-								if err != nil {
-									// Error while retrieving blockNumber, forward call to node
-									proxyServer.ServeHTTP(ctx)
-									return
-								}
-								bsonFilter["fromBlock"] = bson.M{"$ge": blockNumber}
-							}
-						default:
-							bsonFilter["fromBlock"] = bson.M{"$ge": filter.FromBlock}
-						}
-					}
-					if filter.ToBlock != "" {
-						switch filter.ToBlock.(type) {
-						case string:
-							if filter.ToBlock == "earliest" {
-								bsonFilter["toBlock"] = bson.M{"$le": 0}
-							} else if filter.ToBlock == "latest" {
-								blockNumber, err := ethClient.BlockNumber(context.TODO())
-								if err != nil {
-									Logger.Errorf("error while retrieving block number: %v", err)
-									// Error while retrieving blockNumber, forward call to node
-									proxyServer.ServeHTTP(ctx)
-									return
-								}
-								bsonFilter["toBlock"] = bson.M{"$le": blockNumber}
-							}
-						default:
-							bsonFilter["toBlock"] = bson.M{"$le": filter.ToBlock}
-						}
-					}
-					if filter.Topics != nil && len(filter.Topics) > 0 {
-						bsonFilter["topics"] = bson.M{"$in": filter.Topics}
-					}
-				}
-				// Create find query context
-				findCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				// Get logs mongodb collection
-				collection := mongoDatabase.Collection("logs")
-				res, err := collection.Find(findCtx, bsonFilter)
-				if err != nil {
-					Logger.Errorf("error while finding logs on database: %v", err)
-					// Error while finding on database, forward call to node
-					proxyServer.ServeHTTP(ctx)
-					return
-				}
-				err = res.Decode(&logs)
-				if err != nil {
-					Logger.Errorf("error while decoding retrieved logs: %v", err)
-					// Error while decoding request, forward call to node
-					proxyServer.ServeHTTP(ctx)
-					return
-				}
-				// Marshal the logs for redis
-				marshaledLogs, err := json.Marshal(logs)
-				if err != nil {
-					Logger.Errorf("error while marshaling logs: %v", err)
-					// Error while marshaling logs, forward call to node
-					proxyServer.ServeHTTP(ctx)
-					return
-				}
-				// Set the value in cache
-				rdb.SetEX(redisCtx, redisKey, string(marshaledLogs), 30*time.Second)
-				// Set the 200 status code
-				ctx.Response.SetStatusCode(200)
-				// Encode the value read from mongo
-				if err := json.NewEncoder(ctx).Encode(LogResponse{ID: req.ID, JSONRPC: req.JSONRPC, Result: logs}); err != nil {
-					Logger.Errorf("error while sending logs: %v", err)
-					ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
-				}
-				return
-			}
-			json.Unmarshal([]byte(val), &logs)
-			// Set the 200 status code
-			ctx.Response.SetStatusCode(200)
-			// Encode the value read from the cached val
-			if err := json.NewEncoder(ctx).Encode(LogResponse{ID: req.ID, JSONRPC: req.JSONRPC, Result: logs}); err != nil {
-				Logger.Errorf("error while sending logs: %v", err)
-				ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
-			}
-			return
 		}
 	}
-	// Proxy to the node
+	// Serve the context
 	proxyServer.ServeHTTP(ctx)
+}
+
+// WebsocketProxyHandler is the websocket main core
+func WebsocketProxyHandler(ctx *fasthttp.RequestCtx) {
+	err := upgrader.Upgrade(ctx, func(ws *websocket.Conn) {
+		// Defer connection close
+		defer ws.Close()
+		for {
+			var req LogRequest
+			_, message, err := ws.ReadMessage()
+			if err != nil {
+				Logger.Errorf("error while reading message: %v", err)
+				break
+			}
+			err = json.Unmarshal(message, &req)
+			if err != nil {
+				Logger.Errorf("error while marshaling ws body: %v", err)
+				break
+			}
+			if strings.ToLower(req.Method) == "eth_getlogs" {
+				logResponse, err := GetWsLogs(req)
+				if err != nil {
+					Logger.Errorf("error retrieving logs: %v", err)
+					break
+				}
+				ws.WriteJSON(logResponse)
+			} else {
+				// Serve all the requests with the proxy
+				wsProxyServer.ServeHTTP(ctx)
+			}
+		}
+	})
+	if err != nil {
+		Logger.Errorf("error during request context upgrade: %v", err)
+		return
+	}
 }
 
 func main() {
@@ -293,8 +229,10 @@ func main() {
 	}
 	Logger.Info("eth client initialized successfully..")
 	// Create proxy server
+	Logger.Info("creating http and ws proxy servers..")
+	wsProxyServer = proxy.NewWSReverseProxy(fmt.Sprintf("%s:%d", Configuration.Node.Host, Configuration.Node.Port), "/ws")
 	proxyServer = proxy.NewReverseProxy(fmt.Sprintf("%s:%d", Configuration.Node.Host, Configuration.Node.Port))
-	Logger.Info("proxy server created successfully..")
+	Logger.Info("proxy servers created successfully..")
 	// Connect to redis
 	Logger.Info("connecting to redis..")
 	rdb = redis.NewClient(&redis.Options{

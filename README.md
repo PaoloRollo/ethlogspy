@@ -13,6 +13,7 @@
   <p>
     <a href="#status"><strong>Status</strong></a> ·
     <a href="#description"><strong>Description</strong></a> ·
+    <a href="#features"><strong>Features</strong></a> ·
     <a href="#install"><strong>Install</strong></a> ·
     <a href="#contributing"><strong>Contributing</strong></a>
   </p>
@@ -28,11 +29,29 @@
 
 ## Description
 
-TBC.
+**EthLogSpy** is a Golang Reverse Proxy for an Ethereum Node.
+
+It exposes the `localhost` node to the world by just reverse proxying every JSON RPC call, except for the `eth_getLogs` one: on this method EthLogSpy retrieves the logs stored in the database (**MongoDB**) or in the cache (**Redis**) and returns it in the same format that the Ethereum Node would use, basically faking its response.
+
+---
+
+## Features
+
+- [x] HTTP JSON RPC API;
+- [x] WebSocket JSON RPC API;
+- [ ] Support for `eth_subscribe` JSON RPC method. 
 
 ---
 
 ## Install
+
+TBC.
+
+### Docker
+
+TBC.
+
+### Docker Compose
 
 TBC.
 
