@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"math/big"
 	"strings"
 	"time"
 
@@ -42,8 +43,8 @@ type LogRequest struct {
 
 // LogLatestBlockRead struct
 type LogLatestBlockRead struct {
-	Address     string `json:"address"`
-	BlockNumber int    `json:"blockNumber"`
+	Address     string `json:"address" bson:"address,omitempty"`
+	BlockNumber uint64 `json:"blockNumber" bson:"blockNumber,omitempty"`
 }
 
 // LogRequestFilter struct
@@ -56,14 +57,14 @@ type LogRequestFilter struct {
 
 // Log Struct
 type Log struct {
-	Removed          bool     `json:"removed"`
-	LogIndex         uint     `json:"log_index"`
-	TransactionIndex uint     `json:"transaction_index"`
-	BlockNumber      uint64   `json:"block_number"`
-	BlockHash        string   `json:"block_hash"`
-	Address          string   `json:"address"`
-	Data             string   `json:"data"`
-	Topics           []string `json:"topics"`
+	Removed          bool     `json:"removed" bson:"removed,omitempty"`
+	LogIndex         uint     `json:"log_index" bson:"log_index,omitempty"`
+	TransactionIndex uint     `json:"transaction_index" bson:"transaction_index,omitempty"`
+	BlockNumber      uint64   `json:"block_number" bson:"block_number,omitempty"`
+	BlockHash        string   `json:"block_hash" bson:"block_hash,omitempty"`
+	Address          string   `json:"address" bson:"address,omitempty"`
+	Data             string   `json:"data" bson:"data,omitempty"`
+	Topics           []string `json:"topics" bson:"topics,omitempty"`
 }
 
 // LogResponse struct
@@ -74,20 +75,42 @@ type LogResponse struct {
 }
 
 func retrieveLogs() {
+	collection := mongoDatabase.Collection("logLatestBlockRead")
+	blockNumber, err := ethClient.BlockNumber(context.TODO())
+	if err != nil {
+		Logger.Errorf("error while retrieving block number: %v", err)
+		return
+	}
 	// Retrieve all the contracts and iterate
 	for _, contract := range Configuration.Contracts {
+		Logger.Infof("retrieving logs for contract %s at block number %d", contract.Address, blockNumber)
+		var logLatestBlockRead LogLatestBlockRead
 		// Contract address hex to address
 		addr := common.HexToAddress(contract.Address)
+		// Check latest block read
+		res := collection.FindOne(context.Background(), bson.M{"address": contract.Address})
+		if res.Err() != nil {
+			err := res.Decode(&logLatestBlockRead)
+			if err != nil {
+				Logger.Errorf("error while decoding log latest block read: %v", err)
+				continue
+			}
+		} else {
+			logLatestBlockRead = LogLatestBlockRead{Address: contract.Address, BlockNumber: 0}
+		}
 		// Iterate all the signatures
 		for _, signature := range contract.Signatures {
 			// Build the filter query
 			query := ethereum.FilterQuery{
+				FromBlock: big.NewInt(int64(logLatestBlockRead.BlockNumber)),
+				ToBlock:   big.NewInt(int64(blockNumber)),
 				Addresses: []common.Address{addr},
 				Topics:    [][]common.Hash{{crypto.Keccak256Hash([]byte(signature))}},
 			}
 			// Retrieve the logs
 			logs, err := ethClient.FilterLogs(context.Background(), query)
 			if err != nil {
+				Logger.Errorf("error while filtering logs: %v", err)
 				return
 			}
 			// Iterate on all the logs found to create the mongo log
@@ -108,10 +131,18 @@ func retrieveLogs() {
 				collection := mongoDatabase.Collection("logs")
 				_, err := collection.InsertOne(context.Background(), mongoLog)
 				if err != nil {
+					Logger.Errorf("error while inserting log: %v", err)
 					continue
 				}
 			}
+			logLatestBlockRead.BlockNumber = blockNumber
+			_, err = collection.InsertOne(context.Background(), logLatestBlockRead)
+			if err != nil {
+				Logger.Errorf("error while inserting log latest block read: %v", err)
+				continue
+			}
 		}
+		Logger.Infof("contract %s logs at block number %d retrieved successfully!", contract.Address, blockNumber)
 	}
 }
 
@@ -127,6 +158,7 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 			// Build the redis key
 			redisKeyBytes, err := json.Marshal(req)
 			if err != nil {
+				Logger.Errorf("error while marshaling request: %v", err)
 				// Error while marshaling request
 				proxyServer.ServeHTTP(ctx)
 				return
@@ -168,6 +200,7 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 							} else if filter.ToBlock == "latest" {
 								blockNumber, err := ethClient.BlockNumber(context.TODO())
 								if err != nil {
+									Logger.Errorf("error while retrieving block number: %v", err)
 									// Error while retrieving blockNumber, forward call to node
 									proxyServer.ServeHTTP(ctx)
 									return
@@ -187,14 +220,16 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 				defer cancel()
 				// Get logs mongodb collection
 				collection := mongoDatabase.Collection("logs")
-				res, err := collection.Find(findCtx, bson.M{})
+				res, err := collection.Find(findCtx, bsonFilter)
 				if err != nil {
+					Logger.Errorf("error while finding logs on database: %v", err)
 					// Error while finding on database, forward call to node
 					proxyServer.ServeHTTP(ctx)
 					return
 				}
 				err = res.Decode(&logs)
 				if err != nil {
+					Logger.Errorf("error while decoding retrieved logs: %v", err)
 					// Error while decoding request, forward call to node
 					proxyServer.ServeHTTP(ctx)
 					return
@@ -202,6 +237,7 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 				// Marshal the logs for redis
 				marshaledLogs, err := json.Marshal(logs)
 				if err != nil {
+					Logger.Errorf("error while marshaling logs: %v", err)
 					// Error while marshaling logs, forward call to node
 					proxyServer.ServeHTTP(ctx)
 					return
@@ -212,6 +248,7 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 				ctx.Response.SetStatusCode(200)
 				// Encode the value read from mongo
 				if err := json.NewEncoder(ctx).Encode(LogResponse{ID: req.ID, JSONRPC: req.JSONRPC, Result: logs}); err != nil {
+					Logger.Errorf("error while sending logs: %v", err)
 					ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
 				}
 				return
@@ -221,6 +258,7 @@ func ProxyHandler(ctx *fasthttp.RequestCtx) {
 			ctx.Response.SetStatusCode(200)
 			// Encode the value read from the cached val
 			if err := json.NewEncoder(ctx).Encode(LogResponse{ID: req.ID, JSONRPC: req.JSONRPC, Result: logs}); err != nil {
+				Logger.Errorf("error while sending logs: %v", err)
 				ctx.Error(err.Error(), fasthttp.StatusInternalServerError)
 			}
 			return
@@ -246,22 +284,30 @@ func main() {
 	Logger.Info("retrieving configuration..")
 	// Retrieve the config from the config path
 	GetConfig(*validatedPath)
+	Logger.Info("configuration retrieved successfully..")
+	// Initializing ETH client
+	Logger.Info("initializing eth client..")
 	ethClient, err = ethclient.Dial(fmt.Sprintf("http://%s:%d", Configuration.Node.Host, Configuration.Node.Port))
 	if err != nil {
 		panic(err)
 	}
+	Logger.Info("eth client initialized successfully..")
 	// Create proxy server
 	proxyServer = proxy.NewReverseProxy(fmt.Sprintf("%s:%d", Configuration.Node.Host, Configuration.Node.Port))
+	Logger.Info("proxy server created successfully..")
 	// Connect to redis
+	Logger.Info("connecting to redis..")
 	rdb = redis.NewClient(&redis.Options{
 		Addr:     fmt.Sprintf("%s:%d", Configuration.Redis.Host, Configuration.Redis.Port),
 		Password: Configuration.Redis.Password,
 		DB:       Configuration.Redis.DB,
 	})
+	Logger.Info("connected successfully to redis..")
 	// Create mongo client context with timeout
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	// Create mongo client
+	Logger.Info("connecting to mongodb..")
 	mongoClient, err = mongo.Connect(ctx, options.Client().ApplyURI(Configuration.Mongo.Connection))
 	if err != nil {
 		panic(err)
@@ -272,14 +318,17 @@ func main() {
 			panic(err)
 		}
 	}()
+	Logger.Info("connected successfully to mongodb..")
 	// Retrieve the database
 	mongoDatabase = mongoClient.Database(Configuration.Mongo.DbName)
 	// Create cron
+	Logger.Info("creating and starting cron jobs every 30 seconds..")
 	c := cron.New()
 	// Add the retrieve logs function every 30 seconds
 	c.AddFunc("0/30 * * * * ?", retrieveLogs)
 	// Start the cron
 	c.Start()
+	Logger.Info("starting ethlogspy server..")
 	if err := fasthttp.ListenAndServe(fmt.Sprintf(":%d", Configuration.Server.Port), ProxyHandler); err != nil {
 		// Stop the cron
 		c.Stop()
