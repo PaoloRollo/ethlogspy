@@ -27,7 +27,8 @@ type Config struct {
 		DB       int    `yaml:"db"`
 	}
 	Server struct {
-		Port int `yaml:"port"`
+		Port      int    `yaml:"port"`
+		FromBlock uint64 `yaml:"from_block"`
 	}
 	Contracts []Contract `yaml:"contracts"`
 }

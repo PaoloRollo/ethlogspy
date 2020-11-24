@@ -13,17 +13,17 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-var Logger *logrus.Logger
+var logger *logrus.Logger
 
-func SetupLogger() {
-	Logger = &logrus.Logger{
+func setuplogger() {
+	logger = &logrus.Logger{
 		Out:       os.Stdout,
 		Formatter: &logrus.TextFormatter{DisableColors: false, FullTimestamp: true},
 		Level:     logrus.InfoLevel,
 	}
 }
 
-func ValidatePath(path string) (*string, error) {
+func validatePath(path string) (*string, error) {
 	stat, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -34,8 +34,7 @@ func ValidatePath(path string) (*string, error) {
 	return &path, nil
 }
 
-// GetFilter returns the filter from the LogRequestFilter params
-func GetFilter(params []LogRequestFilter) (bson.M, error) {
+func getFilter(params []LogRequestFilter) (bson.M, error) {
 	var bsonFilter bson.M
 	if len(params) > 0 {
 		filter := params[0]
@@ -66,7 +65,7 @@ func GetFilter(params []LogRequestFilter) (bson.M, error) {
 				} else if filter.ToBlock == "latest" {
 					blockNumber, err := ethClient.BlockNumber(context.TODO())
 					if err != nil {
-						Logger.Errorf("error while retrieving block number: %v", err)
+						logger.Errorf("error while retrieving block number: %v", err)
 						return bsonFilter, err
 					}
 					bsonFilter["toBlock"] = bson.M{"$le": blockNumber}
@@ -82,7 +81,7 @@ func GetFilter(params []LogRequestFilter) (bson.M, error) {
 	return bsonFilter, nil
 }
 
-func GetLogs(req LogRequest, ctx *fasthttp.RequestCtx) error {
+func getLogs(req LogRequest, ctx *fasthttp.RequestCtx) error {
 	var logs []Log
 	// Build the redis key
 	redisKeyBytes, err := json.Marshal(req)
@@ -94,7 +93,7 @@ func GetLogs(req LogRequest, ctx *fasthttp.RequestCtx) error {
 	val, err := rdb.Get(redisCtx, redisKey).Result()
 	if err == nil || err == redis.Nil {
 		// An error has occurred or the key was not set, retrieve it from couchdb
-		bsonFilter, err := GetFilter(req.Params)
+		bsonFilter, err := getFilter(req.Params)
 		if err != nil {
 			return err
 		}
@@ -105,18 +104,18 @@ func GetLogs(req LogRequest, ctx *fasthttp.RequestCtx) error {
 		collection := mongoDatabase.Collection("logs")
 		res, err := collection.Find(findCtx, bsonFilter)
 		if err != nil {
-			Logger.Errorf("error while finding logs on database: %v", err)
+			logger.Errorf("error while finding logs on database: %v", err)
 			return err
 		}
 		err = res.Decode(&logs)
 		if err != nil {
-			Logger.Errorf("error while decoding retrieved logs: %v", err)
+			logger.Errorf("error while decoding retrieved logs: %v", err)
 			return err
 		}
 		// Marshal the logs for redis
 		marshaledLogs, err := json.Marshal(logs)
 		if err != nil {
-			Logger.Errorf("error while marshaling logs: %v", err)
+			logger.Errorf("error while marshaling logs: %v", err)
 			return err
 		}
 		// Set the value in cache
@@ -135,8 +134,7 @@ func GetLogs(req LogRequest, ctx *fasthttp.RequestCtx) error {
 	return nil
 }
 
-// GetWsLogs retrieves the log response for the websocket connection
-func GetWsLogs(req LogRequest) (LogResponse, error) {
+func getWsLogs(req LogRequest) (LogResponse, error) {
 	var logs []Log
 	// Build the redis key
 	redisKeyBytes, err := json.Marshal(req)
@@ -148,7 +146,7 @@ func GetWsLogs(req LogRequest) (LogResponse, error) {
 	val, err := rdb.Get(redisCtx, redisKey).Result()
 	if err == nil || err == redis.Nil {
 		// An error has occurred or the key was not set, retrieve it from couchdb
-		bsonFilter, err := GetFilter(req.Params)
+		bsonFilter, err := getFilter(req.Params)
 		if err != nil {
 			return LogResponse{}, err
 		}
@@ -159,18 +157,18 @@ func GetWsLogs(req LogRequest) (LogResponse, error) {
 		collection := mongoDatabase.Collection("logs")
 		res, err := collection.Find(findCtx, bsonFilter)
 		if err != nil {
-			Logger.Errorf("error while finding logs on database: %v", err)
+			logger.Errorf("error while finding logs on database: %v", err)
 			return LogResponse{}, err
 		}
 		err = res.Decode(&logs)
 		if err != nil {
-			Logger.Errorf("error while decoding retrieved logs: %v", err)
+			logger.Errorf("error while decoding retrieved logs: %v", err)
 			return LogResponse{}, err
 		}
 		// Marshal the logs for redis
 		marshaledLogs, err := json.Marshal(logs)
 		if err != nil {
-			Logger.Errorf("error while marshaling logs: %v", err)
+			logger.Errorf("error while marshaling logs: %v", err)
 			return LogResponse{}, err
 		}
 		// Set the value in cache
