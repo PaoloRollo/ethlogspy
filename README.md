@@ -33,7 +33,7 @@
 
 It exposes the given node to the world by just reverse proxying every JSON RPC call, except for the `eth_getLogs` one: on this method EthLogSpy retrieves the logs stored in the database (**MongoDB**) or in the cache (**Redis**) and returns it in the same format that the Ethereum Node would use, basically faking its response.
 
-The yaml configuration files are layed as follows:
+The yaml configuration file is layed out as follows:
 
 ```yaml
 mongo:
@@ -62,8 +62,6 @@ server:
 ---
 
 ## Install
-
-**NOTE**: remember that the default environment is `development`; if you want to change it you need to use the `ENV={development|test|production}` environment variable.
 
 ### Docker
 
