@@ -11,9 +11,9 @@ import (
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/fasthttp/websocket"
 	"github.com/go-redis/redis/v8"
-	"github.com/robfig/cron/v3"
 	"github.com/valyala/fasthttp"
 	proxy "github.com/yeqown/fasthttp-reverse-proxy"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
@@ -188,17 +188,19 @@ func main() {
 	logger.Info("connected successfully to mongodb..")
 	// Retrieve the database
 	mongoDatabase = mongoClient.Database(Configuration.Mongo.DbName)
-	// Create cron
-	logger.Info("creating and starting cron jobs every 30 seconds..")
-	c := cron.New()
-	// Add the retrieve logs function every 30 seconds
-	c.AddFunc("0/30 * * * * ?", retrieveLogs)
-	// Start the cron
-	c.Start()
+	// Check if logs have been already saved
+	res := mongoDatabase.Collection("logs").FindOne(context.Background(), bson.M{})
+	if res.Err() != nil {
+		start := time.Now()
+		logger.Info("syncing mongodb with ethereum logs..")
+		syncLogs()
+		elapsed := time.Since(start)
+		logger.Info("logs sync successful, elapsed: %s", elapsed)
+	}
+	// Start subscribing to logs
+	go subscribeToHead()
 	logger.Info("starting ethlogspy server..")
 	if err := fasthttp.ListenAndServe(fmt.Sprintf(":%d", Configuration.Server.Port), ProxyHandler); err != nil {
-		// Stop the cron
-		c.Stop()
 		logger.Fatal(err)
 	}
 }

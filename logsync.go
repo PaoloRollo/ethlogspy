@@ -6,12 +6,67 @@ import (
 
 	"github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-// RetrieveLogs is the function used to retrieve logs
-func retrieveLogs() {
+func storeLogs(logs []types.Log) {
+	// Iterate on all the logs found to create the mongo log
+	for _, log := range logs {
+		topics := []string{}
+		for _, topic := range log.Topics {
+			topics = append(topics, topic.String())
+		}
+		mongoLog := Log{
+			Removed:          log.Removed,
+			LogIndex:         log.Index,
+			TransactionIndex: log.TxIndex,
+			BlockNumber:      log.BlockNumber,
+			Address:          log.Address.Hex(),
+			Data:             string(log.Data),
+			Topics:           topics,
+		}
+		collection := mongoDatabase.Collection("logs")
+		_, err := collection.InsertOne(context.Background(), mongoLog)
+		if err != nil {
+			logger.Errorf("error while inserting log: %v", err)
+			continue
+		}
+	}
+}
+
+func subscribeToHead() {
+	logger.Info("starting blockchain head subscription..")
+	headers := make(chan *types.Header)
+	sub, err := ethClient.SubscribeNewHead(context.Background(), headers)
+	if err != nil {
+		logger.Fatalf("error while subscribing to blockchain head: %v")
+	}
+	for {
+		select {
+		case err := <-sub.Err():
+			logger.Fatalf("error during blockchain head subscription: %v", err)
+		case header := <-headers:
+			logger.Info("new block received, hash: %s", header.Hash().String())
+			block, err := ethClient.BlockByHash(context.Background(), header.Hash())
+			if err != nil {
+				logger.Fatalf("error while retrieving block by hash %s: %v", header.Hash(), err)
+			}
+			logs, err := ethClient.FilterLogs(context.Background(), ethereum.FilterQuery{
+				FromBlock: block.Number(),
+				ToBlock:   block.Number(),
+			})
+			if err != nil {
+				logger.Fatalf("error while retrieving logs by block number %d: %v", block.Number().Int64(), err)
+			}
+			// Iterate on all the logs found to create the mongo log
+			storeLogs(logs)
+		}
+	}
+}
+
+func syncLogs() {
 	collection := mongoDatabase.Collection("logLatestBlockRead")
 	blockNumber, err := ethClient.BlockNumber(context.TODO())
 	if err != nil {
@@ -41,27 +96,7 @@ func retrieveLogs() {
 			return
 		}
 		// Iterate on all the logs found to create the mongo log
-		for _, log := range logs {
-			topics := []string{}
-			for _, topic := range log.Topics {
-				topics = append(topics, topic.String())
-			}
-			mongoLog := Log{
-				Removed:          log.Removed,
-				LogIndex:         log.Index,
-				TransactionIndex: log.TxIndex,
-				BlockNumber:      log.BlockNumber,
-				Address:          log.Address.Hex(),
-				Data:             string(log.Data),
-				Topics:           topics,
-			}
-			collection := mongoDatabase.Collection("logs")
-			_, err := collection.InsertOne(context.Background(), mongoLog)
-			if err != nil {
-				logger.Errorf("error while inserting log: %v", err)
-				continue
-			}
-		}
+		storeLogs(logs)
 		Configuration.Server.FromBlock = blockNumber
 		serverLatestBlockRead.BlockNumber = blockNumber
 		res = collection.FindOneAndUpdate(context.Background(), bson.M{"_id": 0}, serverLatestBlockRead)
