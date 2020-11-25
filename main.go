@@ -34,62 +34,19 @@ var (
 	}
 )
 
-// LogRequest struct
-type LogRequest struct {
-	JSONRPC string             `json:"jsonrpc"`
-	Method  string             `json:"method"`
-	Params  []LogRequestFilter `json:"params"`
-	ID      int                `json:"id"`
-}
-
-// LogLatestBlockRead struct
-type LogLatestBlockRead struct {
-	Address     string `json:"address" bson:"address,omitempty"`
-	BlockNumber uint64 `json:"blockNumber" bson:"blockNumber,omitempty"`
-}
-
-// ServerLatestBlockRead struct
-type ServerLatestBlockRead struct {
-	ID          int    `json:"id" bson:"_id"`
-	BlockNumber uint64 `json:"blockNumber" bson:"blockNumber,omitempty"`
-}
-
-// LogRequestFilter struct
-type LogRequestFilter struct {
-	FromBlock interface{} `json:"fromBlock"`
-	ToBlock   interface{} `json:"toBlock"`
-	Address   string      `json:"address"`
-	Topics    []string    `json:"topics"`
-}
-
-// Log Struct
-type Log struct {
-	Removed          bool     `json:"removed" bson:"removed,omitempty"`
-	LogIndex         uint     `json:"log_index" bson:"log_index,omitempty"`
-	TransactionIndex uint     `json:"transaction_index" bson:"transaction_index,omitempty"`
-	BlockNumber      uint64   `json:"block_number" bson:"block_number,omitempty"`
-	BlockHash        string   `json:"block_hash" bson:"block_hash,omitempty"`
-	Address          string   `json:"address" bson:"address,omitempty"`
-	Data             string   `json:"data" bson:"data,omitempty"`
-	Topics           []string `json:"topics" bson:"topics,omitempty"`
-}
-
-// LogResponse struct
-type LogResponse struct {
-	ID      int    `json:"id"`
-	JSONRPC string `json:"jsonrpc"`
-	Result  []Log  `json:"result"`
-}
-
 // ProxyHandler is the main core
 func ProxyHandler(ctx *fasthttp.RequestCtx) {
 	if string(ctx.Method()) == "POST" {
 		var req LogRequest
 		json.Unmarshal(ctx.PostBody(), &req)
-		if strings.ToLower(req.Method) == "eth_getlogs" && req.ID == 1 {
+		logger.Infof("new request incoming for method: %s", req.Method)
+		if strings.ToLower(req.Method) == "eth_getlogs" {
+			logger.Infof("spying on eth_getLogs.. shh...")
 			err := getLogs(req, ctx)
 			if err != nil {
 				logger.Errorf("error while retrieving logs: %v", err)
+			} else {
+				return
 			}
 		}
 	}
@@ -152,7 +109,7 @@ func main() {
 	logger.Info("configuration retrieved successfully..")
 	// Initializing ETH client
 	logger.Info("initializing eth client..")
-	ethClient, err = ethclient.Dial(fmt.Sprintf("http://%s:%d", Configuration.Node.Host, Configuration.Node.Port))
+	ethClient, err = ethclient.Dial(fmt.Sprintf("ws://%s:%d", Configuration.Node.Host, Configuration.Node.Port))
 	if err != nil {
 		panic(err)
 	}
@@ -195,7 +152,7 @@ func main() {
 		logger.Info("syncing mongodb with ethereum logs..")
 		syncLogs()
 		elapsed := time.Since(start)
-		logger.Info("logs sync successful, elapsed: %s", elapsed)
+		logger.Info("logs sync successful, elapsed: ", elapsed)
 	}
 	// Start subscribing to logs
 	go subscribeToHead()

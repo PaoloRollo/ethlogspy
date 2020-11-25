@@ -11,44 +11,19 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func storeLogs(logs []types.Log) {
-	// Iterate on all the logs found to create the mongo log
-	for _, log := range logs {
-		topics := []string{}
-		for _, topic := range log.Topics {
-			topics = append(topics, topic.String())
-		}
-		mongoLog := Log{
-			Removed:          log.Removed,
-			LogIndex:         log.Index,
-			TransactionIndex: log.TxIndex,
-			BlockNumber:      log.BlockNumber,
-			Address:          log.Address.Hex(),
-			Data:             string(log.Data),
-			Topics:           topics,
-		}
-		collection := mongoDatabase.Collection("logs")
-		_, err := collection.InsertOne(context.Background(), mongoLog)
-		if err != nil {
-			logger.Errorf("error while inserting log: %v", err)
-			continue
-		}
-	}
-}
-
 func subscribeToHead() {
 	logger.Info("starting blockchain head subscription..")
 	headers := make(chan *types.Header)
 	sub, err := ethClient.SubscribeNewHead(context.Background(), headers)
 	if err != nil {
-		logger.Fatalf("error while subscribing to blockchain head: %v")
+		logger.Fatalf("error while subscribing to blockchain head: %v", err)
 	}
 	for {
 		select {
 		case err := <-sub.Err():
 			logger.Fatalf("error during blockchain head subscription: %v", err)
 		case header := <-headers:
-			logger.Info("new block received, hash: %s", header.Hash().String())
+			logger.Infof("new block received, hash: %s", header.Hash().String())
 			block, err := ethClient.BlockByHash(context.Background(), header.Hash())
 			if err != nil {
 				logger.Fatalf("error while retrieving block by hash %s: %v", header.Hash(), err)
@@ -99,9 +74,13 @@ func syncLogs() {
 		storeLogs(logs)
 		Configuration.Server.FromBlock = blockNumber
 		serverLatestBlockRead.BlockNumber = blockNumber
-		res = collection.FindOneAndUpdate(context.Background(), bson.M{"_id": 0}, serverLatestBlockRead)
+		res = collection.FindOneAndUpdate(context.Background(), bson.M{"_id": 0}, bson.M{"$set": serverLatestBlockRead})
 		if res.Err() != nil {
-			logger.Errorf("error while inserting log latest block read: %v", err)
+			serverLatestBlockRead.ID = 0
+			_, err = collection.InsertOne(context.Background(), serverLatestBlockRead)
+			if err != nil {
+				logger.Errorf("error while inserting log latest block read: %v", res.Err())
+			}
 		}
 	} else {
 		// Retrieve all the contracts and iterate
@@ -115,8 +94,7 @@ func syncLogs() {
 			if res.Err() != nil {
 				err := res.Decode(&logLatestBlockRead)
 				if err != nil {
-					logger.Errorf("error while decoding log latest block read: %v", err)
-					continue
+					logLatestBlockRead = LogLatestBlockRead{Address: contract.Address, BlockNumber: 0}
 				}
 			} else {
 				logLatestBlockRead = LogLatestBlockRead{Address: contract.Address, BlockNumber: 0}
@@ -137,27 +115,7 @@ func syncLogs() {
 					return
 				}
 				// Iterate on all the logs found to create the mongo log
-				for _, log := range logs {
-					topics := []string{}
-					for _, topic := range log.Topics {
-						topics = append(topics, topic.String())
-					}
-					mongoLog := Log{
-						Removed:          log.Removed,
-						LogIndex:         log.Index,
-						TransactionIndex: log.TxIndex,
-						BlockNumber:      log.BlockNumber,
-						Address:          log.Address.Hex(),
-						Data:             string(log.Data),
-						Topics:           topics,
-					}
-					collection := mongoDatabase.Collection("logs")
-					_, err := collection.InsertOne(context.Background(), mongoLog)
-					if err != nil {
-						logger.Errorf("error while inserting log: %v", err)
-						continue
-					}
-				}
+				storeLogs(logs)
 				logLatestBlockRead.BlockNumber = blockNumber
 				_, err = collection.InsertOne(context.Background(), logLatestBlockRead)
 				if err != nil {

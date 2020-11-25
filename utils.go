@@ -38,6 +38,7 @@ func getFilter(params []LogRequestFilter) (bson.M, error) {
 	var bsonFilter bson.M
 	if len(params) > 0 {
 		filter := params[0]
+		logger.Infof("using filter %+v", filter)
 		if filter.Address != "" {
 			bsonFilter["address"] = filter.Address
 		}
@@ -71,7 +72,9 @@ func getFilter(params []LogRequestFilter) (bson.M, error) {
 					bsonFilter["toBlock"] = bson.M{"$le": blockNumber}
 				}
 			default:
-				bsonFilter["toBlock"] = bson.M{"$le": filter.ToBlock}
+				if filter.ToBlock != nil {
+					bsonFilter["toBlock"] = bson.M{"$le": filter.ToBlock}
+				}
 			}
 		}
 		if filter.Topics != nil && len(filter.Topics) > 0 {
@@ -107,10 +110,14 @@ func getLogs(req LogRequest, ctx *fasthttp.RequestCtx) error {
 			logger.Errorf("error while finding logs on database: %v", err)
 			return err
 		}
-		err = res.Decode(&logs)
-		if err != nil {
-			logger.Errorf("error while decoding retrieved logs: %v", err)
-			return err
+		defer res.Close(findCtx)
+		for res.Next(findCtx) {
+			var log Log
+			if err = res.Decode(&log); err != nil {
+				logger.Errorf("error while retrieving logs: %v", err)
+				return err
+			}
+			logs = append(logs, log)
 		}
 		// Marshal the logs for redis
 		marshaledLogs, err := json.Marshal(logs)
@@ -160,10 +167,14 @@ func getWsLogs(req LogRequest) (LogResponse, error) {
 			logger.Errorf("error while finding logs on database: %v", err)
 			return LogResponse{}, err
 		}
-		err = res.Decode(&logs)
-		if err != nil {
-			logger.Errorf("error while decoding retrieved logs: %v", err)
-			return LogResponse{}, err
+		defer res.Close(findCtx)
+		for res.Next(findCtx) {
+			var log Log
+			if err = res.Decode(&log); err != nil {
+				logger.Errorf("error while retrieving logs: %v", err)
+				return LogResponse{}, err
+			}
+			logs = append(logs, log)
 		}
 		// Marshal the logs for redis
 		marshaledLogs, err := json.Marshal(logs)

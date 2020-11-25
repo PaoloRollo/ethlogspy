@@ -1,15 +1,11 @@
-contracts:
-  - address: ""
-  - signatures:
-    - "ItemSet(bytes32,bytes32)"
 mongo:
-  connection: "mongodb://localhost:27017"
+  connection: "mongodb://mongo:27017"
   db_name: "ethlogspy"
 node:
-  host: "localhost"
-  port: 8535
+  host: "host.docker.internal"
+  port: 7545
 redis:
-  host: "localhost"
+  host: "redis"
   port: 6379
   password: ""
   db: 0

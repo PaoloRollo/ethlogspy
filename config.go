@@ -10,29 +10,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Config struct is used to define the application configuration object
-type Config struct {
-	Mongo struct {
-		Connection string `yaml:"connection"`
-		DbName     string `yaml:"db_name"`
-	}
-	Node struct {
-		Host string `yaml:"host"`
-		Port int    `yaml:"port"`
-	}
-	Redis struct {
-		Host     string `yaml:"host"`
-		Port     int    `yaml:"port"`
-		Password string `yaml:"password"`
-		DB       int    `yaml:"db"`
-	}
-	Server struct {
-		Port      int    `yaml:"port"`
-		FromBlock uint64 `yaml:"from_block"`
-	}
-	Contracts []Contract `yaml:"contracts"`
-}
-
 // Contract struct
 type Contract struct {
 	Address    string   `yaml:"address"`
