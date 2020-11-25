@@ -157,7 +157,7 @@ func main() {
 	// Start subscribing to logs
 	go subscribeToHead()
 	logger.Info("starting ethlogspy server..")
-	if err := fasthttp.ListenAndServe(fmt.Sprintf(":%d", Configuration.Server.Port), ProxyHandler); err != nil {
+	if err := fasthttp.ListenAndServe(":8080", ProxyHandler); err != nil {
 		logger.Fatal(err)
 	}
 }

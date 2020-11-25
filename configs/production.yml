@@ -1,7 +1,3 @@
-contracts:
-  - address: ""
-  - signatures:
-    - "ItemSet(bytes32,bytes32)"
 mongo:
   connection: "mongodb://localhost:27017"
   db_name: "ethlogspy"
@@ -14,4 +10,4 @@ redis:
   password: ""
   db: 0
 server:
-  port: 8080
+  block_number: 0

@@ -10,4 +10,4 @@ redis:
   password: ""
   db: 0
 server:
-  port: 8080
+  block_number: 0
