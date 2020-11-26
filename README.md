@@ -16,6 +16,7 @@
     <a href="#features"><strong>Features</strong></a> ·
     <a href="#install"><strong>Install</strong></a> ·
     <a href="#example"><strong>Example</strong></a> ·
+    <a href="#security"><strong>Security</strong></a> ·
     <a href="#contributing"><strong>Contributing</strong></a>
   </p>
 </div>
@@ -60,7 +61,10 @@ server:
 
 - [x] HTTP JSON RPC API;
 - [x] WebSocket JSON RPC API;
-- [x] Support for `eth_subscribe` JSON RPC method. 
+- [x] Support for `eth_subscribe` JSON RPC method;
+- [ ] Disable/enable Redis cache via configuration;
+- [ ] Disable/enable in-memory cache via configuration;
+- [ ] Logs integrity check (via routine or after every call?).
 
 ---
 
@@ -130,6 +134,17 @@ const contract = new web3.eth.Contract(jsonInterface, address); // can you get a
 ```
 
 What kind of spy doesn't allow all of this?
+
+---
+
+## Security considerations
+
+Please, if you're running EthLogSpy with MongoDB and Redis on the same machine, do not expose to the public the `27017` and `6379` ports (or whatever ports you did choose for MongoDB and Redis) or at least, if you do, make sure to edit the `docker-compose.yml` properly and the `config.yml` file and add some authentication to both the db and the cache.
+
+MongoDB becomes the source of truth for all the logs that can be retrieved through your node, so make sure the following:
+- Do not expose its port publicly without any security mechanism;
+- Do not delete the persistent volume where the db is stored if you don't want to sync again;
+- Do not manually edit any of the logs inside of the database: this could cause some inconsistency between the real Ethereum Blockchain state and your EthLogSpy instance.
 
 ---
 
