@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	cors "github.com/AdhityaRamadhanus/fasthttpcors"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/fasthttp/websocket"
 	"github.com/go-redis/redis/v8"
@@ -156,8 +157,20 @@ func main() {
 	}
 	// Start subscribing to logs
 	go subscribeToHead()
+	// Create handler
+	requestHandler := func(ctx *fasthttp.RequestCtx) {
+		if strings.Contains(string(ctx.Path()), "/ws") {
+			WebsocketProxyHandler(ctx)
+		} else {
+			ProxyHandler(ctx)
+		}
+	}
+	// Add cors middleware
+	withCors := cors.NewCorsHandler(cors.Options{
+		AllowedOrigins: []string{Configuration.Server.CorsOrigin},
+	})
 	logger.Info("starting ethlogspy server..")
-	if err := fasthttp.ListenAndServe(":8080", ProxyHandler); err != nil {
+	if err := fasthttp.ListenAndServe(":8080", withCors.CorsMiddleware(requestHandler)); err != nil {
 		logger.Fatal(err)
 	}
 }

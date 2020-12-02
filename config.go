@@ -8,12 +8,6 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-// Contract struct
-type Contract struct {
-	Address    string   `yaml:"address"`
-	Signatures []string `yaml:"signatures"`
-}
-
 // Configuration retains the config struct for the EthLogSpy instance
 var Configuration *Config
 

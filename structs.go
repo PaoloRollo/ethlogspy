@@ -17,7 +17,8 @@ type Config struct {
 		DB       int    `yaml:"db"`
 	}
 	Server struct {
-		FromBlock uint64 `yaml:"from_block"`
+		FromBlock  uint64 `yaml:"from_block"`
+		CorsOrigin string `yaml:"cors_origin"`
 	}
 }
 

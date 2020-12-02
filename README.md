@@ -53,6 +53,7 @@ redis:
   db: 0 # redis db
 server:
   block_number: 0 # starting block number for log syncing
+  cors_origin: "*" # allowed cors origin ("*" means all)
 ```
 
 ---
@@ -62,6 +63,7 @@ server:
 - [x] HTTP JSON RPC API;
 - [x] WebSocket JSON RPC API;
 - [x] Support for `eth_subscribe` JSON RPC method;
+- [x] Added CORS;
 - [ ] Disable/enable Redis cache via configuration;
 - [ ] Disable/enable in-memory cache via configuration;
 - [ ] Logs integrity check (via routine or after every call?).

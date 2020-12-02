@@ -11,3 +11,4 @@ redis:
   db: 0 # redis db
 server:
   block_number: 0 # starting block number for log syncing
+  cors_origin: "*"
