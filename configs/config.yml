@@ -1,0 +1,13 @@
+mongo:
+  connection: "mongodb://localhost:27017" # mongodb connection string
+  db_name: "ethlogspy" # mongodb database name
+node:
+  host: "localhost" # ethereum node host
+  port: 8535 # ethereum node port
+redis:
+  host: "localhost" # redis host 
+  port: 6379 # redis port
+  password: "" # redis password
+  db: 0 # redis db
+server:
+  block_number: 0 # starting block number for log syncing
