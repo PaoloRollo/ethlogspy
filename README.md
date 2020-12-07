@@ -63,7 +63,8 @@ server:
 - [x] HTTP JSON RPC API;
 - [x] WebSocket JSON RPC API;
 - [x] Support for `eth_subscribe` JSON RPC method;
-- [x] Added CORS;
+- [x] CORS;
+- [ ] Intel mode for analytics;
 - [ ] Disable/enable Redis cache via configuration;
 - [ ] Disable/enable in-memory cache via configuration;
 - [ ] Logs integrity check (via routine or after every call?).
