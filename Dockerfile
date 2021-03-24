@@ -9,3 +9,4 @@ RUN go build -o ethlogspy *.go
 
 EXPOSE 8080
 ENTRYPOINT [ "./entrypoint.sh" ]
+

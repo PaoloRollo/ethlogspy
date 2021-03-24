@@ -1,0 +1,12 @@
+{
+  "name": "ethlogspy.public.dappnode.eth",
+  "version": "0.1.0",
+  "description": "Reverse proxy for Ethereum nodes that stores logs information for a faster retrieval.",
+  "type": "service",
+  "author": "orbulo.eth",
+  "categories": ["Developer tools"],
+  "links": {
+    "homepage": "https://your-project-homepage-or-docs.io"
+  },
+  "license": "MIT"
+}
