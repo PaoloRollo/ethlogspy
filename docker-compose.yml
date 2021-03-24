@@ -1,24 +1,24 @@
-version: '3'
+version: "3"
 services:
   mongo:
-    image: mongo:latest
+    image: "mongo:latest"
     container_name: mongo
     ports:
-      - '27017:27017'
+      - "27017:27017"
   redis:
-    image: redis:latest
+    image: "redis:latest"
     container_name: redis
     ports:
-      - '6379:6379'
+      - "6379:6379"
   ethlogspy:
     build: .
     container_name: ethlogspy
     ports:
-      - '8080:8080'
+      - "8080:8080"
     depends_on:
       - mongo
       - redis
     links:
       - mongo
       - redis
-    
+    image: "ethlogspy.ethlogspy.public.dappnode.eth:0.1.0"
