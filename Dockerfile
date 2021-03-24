@@ -12,7 +12,7 @@ FROM alpine:latest
 RUN mkdir -p /usr/local/ethlogspy
 WORKDIR /usr/local/ethlogspy
 COPY --from=build /usr/local/ethlogspy/ethlogspy .
-COPY --from=build /usr/local/ethlogspy/configs/config.yml .
+COPY --from=build /usr/local/ethlogspy/config.yml .
 COPY --from=build /usr/local/ethlogspy/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 EXPOSE 8080
