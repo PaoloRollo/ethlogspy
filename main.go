@@ -98,7 +98,7 @@ func main() {
 	// Parse the config path or use the default value
 	configPath := flag.String("config", "/usr/local/ethlogspy/configs/", "path to config file")
 	// Parse the intel mode flag
-	intelMode := flag.Bool("intel", false, "activate intel mode")
+	// intelMode := flag.Bool("intel", false, "activate intel mode")
 	flag.Parse()
 	// Validates the path
 	validatedPath, err := validatePath(*configPath)
