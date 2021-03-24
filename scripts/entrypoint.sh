@@ -1,3 +1,3 @@
 #!/bin/bash
 
-./ethlogspy
+./ethlogspy -config /usr/local/ethlogspy/
