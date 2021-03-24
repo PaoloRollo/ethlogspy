@@ -13,6 +13,11 @@ services:
   ethlogspy:
     build: .
     container_name: ethlogspy
+    environment:
+      NODE_HOST: ${NODE_HOST}
+      NODE_PORT: ${NODE_PORT}
+      CORS_ORIGIN: ${CORS_ORIGIN}
+      BLOCK_NUMBER: ${BLOCK_NUMBER}
     ports:
       - "8080:8080"
     depends_on:

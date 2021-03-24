@@ -8,7 +8,7 @@ COPY scripts/entrypoint.sh /usr/local/ethlogspy/
 WORKDIR /usr/local/ethlogspy
 RUN go mod tidy && go build -o ethlogspy *.go
 
-FROM alpine:latest 
+FROM golang:latest 
 RUN mkdir -p /usr/local/ethlogspy
 WORKDIR /usr/local/ethlogspy
 COPY --from=build /usr/local/ethlogspy/ethlogspy .

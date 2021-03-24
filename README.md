@@ -43,17 +43,20 @@ The yaml configuration file is layed out as follows:
 mongo:
   connection: "mongodb://localhost:27017" # mongodb connection string
   db_name: "ethlogspy" # mongodb database name
-node:
-  host: "localhost" # ethereum node host
-  port: 8535 # ethereum node port
 redis:
   host: "localhost" # redis host 
   port: 6379 # redis port
   password: "" # redis password
   db: 0 # redis db
-server:
-  block_number: 0 # starting block number for log syncing
-  cors_origin: "*" # allowed cors origin ("*" means all)
+```
+
+The following environment variables are used:
+
+```bash
+NODE_HOST = # host name of the ethereum node (default: "localhost")
+NODE_PORT = # port of the ethereum node (default: 8545)
+CORS_ORIGIN = # allowed cors origins (default: "*")
+BLOCK_NUMBER = # block number where to start the retrieval (default: 0)
 ```
 
 ---

@@ -19,19 +19,21 @@ func subscribeToHead() {
 	for {
 		select {
 		case err := <-sub.Err():
-			logger.Fatalf("error during blockchain head subscription: %v", err)
+			logger.Errorf("error during blockchain head subscription: %v", err)
 		case header := <-headers:
 			logger.Infof("new block received, hash: %s", header.Hash().String())
 			block, err := ethClient.BlockByHash(context.Background(), header.Hash())
 			if err != nil {
-				logger.Fatalf("error while retrieving block by hash %s: %v", header.Hash(), err)
+				logger.Errorf("error while retrieving block by hash %s: %v", header.Hash(), err)
+				continue
 			}
 			logs, err := ethClient.FilterLogs(context.Background(), ethereum.FilterQuery{
 				FromBlock: block.Number(),
 				ToBlock:   block.Number(),
 			})
 			if err != nil {
-				logger.Fatalf("error while retrieving logs by block number %d: %v", block.Number().Int64(), err)
+				logger.Errorf("error while retrieving logs by block number %d: %v", block.Number().Int64(), err)
+				continue
 			}
 			// Iterate on all the logs found to create the mongo log
 			storeLogs(logs)
@@ -60,12 +62,14 @@ func syncLogs() {
 		FromBlock: big.NewInt(int64(Configuration.Server.FromBlock)),
 		ToBlock:   big.NewInt(int64(blockNumber)),
 	}
+	logger.Infof("retrieving logs using the following query: %+v", query)
 	// Retrieve the logs
 	logs, err := ethClient.FilterLogs(context.Background(), query)
 	if err != nil {
 		logger.Errorf("error while filtering logs: %v", err)
 		return
 	}
+	logger.Info("logs retrieved successfully from the node, storing them..")
 	// Iterate on all the logs found to create the mongo log
 	storeLogs(logs)
 	serverLatestBlockRead.BlockNumber = blockNumber
