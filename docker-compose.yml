@@ -14,10 +14,10 @@ services:
     build: .
     container_name: ethlogspy
     environment:
-      - "NODE_HOST=geth.dappnode"
-      - "NODE_PORT=8546"
-      - "CORS_ORIGIN=*"
-      - "BLOCK_NUMBER=0"
+      - NODE_HOST=geth.dappnode
+      - NODE_PORT=8546
+      - CORS_ORIGIN=*
+      - BLOCK_NUMBER=0
     ports:
       - "8080:8080"
     depends_on:
