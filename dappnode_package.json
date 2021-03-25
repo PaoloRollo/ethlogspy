@@ -1,7 +1,7 @@
 {
   "name": "ethlogspy.public.dappnode.eth",
   "version": "0.1.0",
-  "description": "Reverse proxy for Ethereum nodes that stores logs information for a faster retrieval; in more words, it just sends back to the given node except for the `eth_getLogs` function, where it retrieves the data from the database (MongoDB) or from the cache (Redis) and returns the data in the same format that the real node would use, basically replicating its response. It is fully compatible with any `web3` library (such as `web3js`), so your dApp can easily retrieve the logs just by using its instance.",
+  "description": "Reverse proxy for Ethereum nodes that stores logs information for a faster retrieval; in more words, it just sends back to the given node except for the `eth_getLogs` function, where it retrieves the data from the database (MongoDB) or from the cache (Redis) and returns the data in the same format that the real node would use, basically replicating its response. It is fully compatible with any `web3` library (such as `web3js`), so your dApp can easily retrieve the logs just by using its instance. The environment variables are the following: `NODE_HOST` corresponds to the Ethereum node host name (eg. `geth.dappnode`); `NODE_PORT` is the `websocket` port of that node (eg. 8546); `CORS_ORIGIN` is used to restrict the requests to only allowed origins (default is `*`); `BLOCK_NUMBER` is the block where the log sync must start.",
   "type": "service",
   "author": "orbulo.eth",
   "categories": ["Developer tools"],
