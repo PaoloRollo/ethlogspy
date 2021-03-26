@@ -15,6 +15,7 @@
     <a href="#description"><strong>Description</strong></a> ·
     <a href="#features"><strong>Features</strong></a> ·
     <a href="#install"><strong>Install</strong></a> ·
+    <a href="#dappnode"><strong>DAppNode</strong></a> ·
     <a href="#example"><strong>Example</strong></a> ·
     <a href="#security"><strong>Security</strong></a> ·
     <a href="#contributing"><strong>Contributing</strong></a>
@@ -115,6 +116,22 @@ nohup docker-compose up &
 ```
 
 This will build and run a local instance of MongoDB, Redis and EthLogSpy, ready for use.
+
+---
+
+## DAppNode
+
+EthLogSpy can be installed on a **DAppNode** with one the following architectures:
+- `linux/amd64`
+- `linux/arm64`
+
+The package is not available yet on the official **DAppStore**, but soon it will be. In order to install it on a DAppNode you must be connected either to the DAppNode Wi-Fi or its VPN and have the <a href="https://github.com/dappnode/DAppNodeSDK">`@dappnode/dappnodesdk`</a> installed on your computer; you can follow the instructions at the link or simply run on your terminal the following line:
+
+```bash
+npm install -g @dappnode/dappnodesdk
+```
+
+After you've installed the SDK, clone this repository and run the `dappnodesdk build` command. After everything it's finished, you'll receive an IPFS link to install the EthLogSpy (+ MongoDB + Redis) containers on your node.
 
 ---
 
